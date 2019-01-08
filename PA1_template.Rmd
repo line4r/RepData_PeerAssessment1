@@ -1,25 +1,107 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+JHU Project 5, Peer-graded Assignment
+============
+
+    get ready for basic library package and download, unzip a data file to desktop.
+    briefly look through what the data structure is, how composed it is.
+
+  1. Code for reading in the dataset and/or processing the data
+  
+```{r,cache=TRUE}
+
+library(dplyr)
+library(ggplot2)
+
+if(!dir.exists("data")){dir.create("data")}
+fileUrl = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(fileUrl,file.path("./data","monitoring_data.zip"))
+unzip(zipfile = file.path("./data","monitoring_data.zip"), exdir = "./data")
+
+fileList = list.files("./data", recursive = TRUE)
+ori_data = read.csv(file.path("./data",fileList[1]))
+head(ori_data)
+str(ori_data)
+
+ori_data$date = as.Date(ori_data$date)
+
+step_na = is.na(ori_data$steps)
+na_data = ori_data[step_na,]
+mo_data = ori_data[!step_na,]
+```
+
+  2. Histogram of the total number of steps taken each day
+  3. Mean and median number of steps taken each day
+```{r,cache=TRUE}
+mo_data1 = mo_data %>% group_by(date) %>% summarize(total_steps = sum(steps))
+gg = ggplot(mo_data1,aes(total_steps))
+gg + geom_histogram(binwidth=500) +
+    labs(title = "The total daily step count") +
+    labs(x = "total steps", y = "# of each day") +
+    scale_x_continuous(breaks = seq(0,21500,1000)) +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    annotate("text", x = mean(mo_data1$total_steps)+2000, y = 5,
+             label = c("mean total # of steps is 10766.19"),col="violetred") +
+    annotate("text", x = median(mo_data1$total_steps+2000), y = 5.5,
+             label = c("median total # of steps is 10765"),col="steelblue")
+    
+```
+
+  4. Time series plot of the average number of steps taken
+  5. The 5-minute interval that, on average, contains the maximum number of steps
+```{r,cache=TRUE}
+mo_data2 = mo_data %>% group_by(interval) %>% summarize(avr_steps = mean(steps))
+itv_idx = mo_data2$interval[which.max(mo_data2$avr_steps)]
+gg2 <- ggplot(mo_data2,aes(interval,avr_steps))
+gg2 + geom_line(col="slateblue") + 
+    geom_vline(xintercept = itv_idx, col = "violetred") +
+    labs(title = "The average number of steps taken, averaged across all days") +
+    labs(x = "interval", y = "average steps") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    annotate("text", x = itv_idx + 10, y = max(mo_data2$avr_steps),
+    label = c("maximum # of steps is 206.1698 at interval 835"),col="violetred")
+```
 
 
-## Loading and preprocessing the data
+  6. Code to describe and show a strategy for imputing missing data
+```{r,cache=TRUE}
+sum(nrow(na_data))
+new_data = ori_data
+new_data[step_na,]$steps = mean(mo_data$steps)
+```
 
+  7. Histogram of the total number of steps taken each day after missing values are imputed
+```{r,cache=TRUE}
+new_data1 = new_data %>% group_by(date) %>% summarize(total_steps = sum(steps))
+gg = ggplot(new_data1,aes(total_steps))
+gg = ggplot(new_data1,aes(total_steps))
+gg + geom_histogram(binwidth=500) +
+    labs(title = "The total daily step count (changing NA to mean)") +
+    labs(x = "total steps", y = "# of each day") +
+    scale_x_continuous(breaks = seq(0,21500,1000)) +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    annotate("text", x = mean(new_data1$total_steps)+2000, y = 5,
+             label = c("mean total # of steps is 10766.19"),col="violetred") +
+    annotate("text", x = median(new_data1$total_steps+2000), y = 5.5,
+             label = c("median total # of steps is 10766.19"),col="steelblue")
+```
 
+  8. Panel plot comparing the average number of steps taken per 5-minute interval across weekdays and weekends
+```{r,cache=TRUE}
+oriori = ori_data %>% mutate(weekday = "N")
+oriori = cbind(oriori, weekend_day = "Y")
+oriori[,5] = as.character("Y")
+for (i in 1:nrow(oriori)){
+    wd = weekdays(oriori[i,2])
+    if (wd %in% c("토요일","일요일")){
+        oriori[i,4] = "Y"
+        oriori[i,5] = "N"
+    }
+}
+oriori[,4] = factor(as.factor(oriori[,4]),levels=c("Y","N"))
 
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
+oriori2 = oriori %>% group_by(interval,weekday) %>% summarize(avr_steps = mean(steps,na.rm=TRUE))
+gg2 <- ggplot(oriori2,aes(interval,avr_steps,fill=weekday))
+gg2 + geom_line(aes(color=weekday)) +
+    labs(title = "The differences in activity patterns between weekdays and weekends") +
+    labs(x = "interval", y = "average steps") +
+    theme(plot.title = element_text(hjust = 0.5))
+```
